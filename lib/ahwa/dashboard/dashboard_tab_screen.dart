@@ -27,21 +27,15 @@ class _DashboardTabScreenState extends State<DashboardTabScreen> {
   }
 
   Future<void> _initData() async {
-    try {
-      await LocalDatabaseHelper().initDatabase();
-      orderRepository =
-          OrderRepository(OrdersDatabaseServiceImpl(LocalDatabaseHelper()));
+    await LocalDatabaseHelper().initDatabase();
+    orderRepository =
+        OrderRepository(OrdersDatabaseServiceImpl(LocalDatabaseHelper()));
 
-      final loadedOrders = await orderRepository.getAllOrders();
-      setState(() {
-        orders = List<OrdersModel>.from(loadedOrders);
-        isLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        isLoading = false;
-      });
-    }
+    final loadedOrders = await orderRepository.getAllOrders();
+    setState(() {
+      orders = List<OrdersModel>.from(loadedOrders);
+      isLoading = false;
+    });
   }
 
   Future<void> _refreshData() async {
@@ -49,6 +43,33 @@ class _DashboardTabScreenState extends State<DashboardTabScreen> {
       isLoading = true;
     });
     await _initData();
+  }
+
+  Future<void> _completeOrder(OrdersModel order) async {
+    try {
+      final updatedOrder = order.copyWith(
+        status: OrderStatus.completed,
+        completedAt: DateTime.now(),
+      );
+
+      await orderRepository.updateOrder(updatedOrder);
+
+      await _refreshData();
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('تم تأكيد الطلب بنجاح 🎉'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('حدث خطأ: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   String _formatDate(DateTime date) {
@@ -177,8 +198,8 @@ class _DashboardTabScreenState extends State<DashboardTabScreen> {
                         vertical: 4,
                       ),
                       decoration: BoxDecoration(
-                        color:
-                            _getStatusColor(order.status).withValues(alpha: .1),
+                        color: _getStatusColor(order.status)
+                            .withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(6),
                         border: Border.all(
                           color: _getStatusColor(order.status),
@@ -216,6 +237,70 @@ class _DashboardTabScreenState extends State<DashboardTabScreen> {
                   ),
                 ],
                 const SizedBox(height: 16),
+                Row(
+                  children: [
+                    if (order.status == OrderStatus.pending)
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: () => _completeOrder(order),
+                          icon: const Icon(Iconsax.tick_circle_copy, size: 16),
+                          label: const Text('تأكيد الطلب'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.green,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                        ),
+                      ),
+                    if (order.status == OrderStatus.pending)
+                      const SizedBox(width: 8),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          showDialog(
+                            context: context,
+                            builder: (context) => AlertDialog(
+                              title: Text('تفاصيل الطلب #${order.orderId}'),
+                              content: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text('الزبون: ${order.customerName}'),
+                                  Text('السعر: ${order.total} جنيه'),
+                                  Text(
+                                      'التاريخ: ${_formatDate(order.createdAt)}'),
+                                  Text(
+                                      'الحالة: ${_getStatusText(order.status)}'),
+                                  if (order.notes.isNotEmpty == true)
+                                    Text('ملاحظات: ${order.notes}'),
+                                ],
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(context),
+                                  child: const Text('إغلاق'),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                        icon: const Icon(Iconsax.eye_copy, size: 16),
+                        label: const Text('التفاصيل'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.blue,
+                          side: const BorderSide(color: Colors.blue),
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ],
             ),
           );
